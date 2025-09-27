@@ -1,55 +1,99 @@
+import { useState, useEffect } from "react";
 import { Calendar, Clock, User, Phone, Mail, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AppointmentService } from "@/services/appointmentService";
+import { AuthService } from "@/services/authService";
+import { useToast } from "@/hooks/use-toast";
+import type { Appointment } from "@/services/api";
 
 const Profile = () => {
-  // Mock user data and appointments
-  const user = {
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  // Get user data from localStorage or context
+  const storedUser = AuthService.getStoredUser();
+  const user = storedUser || {
     name: "John Doe",
     phone: "(555) 123-4567",
-    email: "john.doe@email.com",
+    email: "john.doe@email.com"
+  };
+  
+  // Mock additional user stats (in real app, this would come from API)
+  const userStats = {
     totalAppointments: 12,
     memberSince: "March 2023"
   };
 
-  const upcomingAppointments = [
-    {
-      id: 1,
-      date: "2024-01-15",
-      time: "2:30 PM",
-      service: "Classic Cut",
-      barber: "Mike Johnson",
-      status: "confirmed"
-    },
-    {
-      id: 2,
-      date: "2024-01-22",
-      time: "10:00 AM",
-      service: "Full Service",
-      barber: "Sarah Smith",
-      status: "confirmed"
-    }
-  ];
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const response = await AppointmentService.getUserAppointments();
+        
+        if (response.success && response.data) {
+          setAppointments(response.data);
+        } else {
+          // Fallback to mock data if API fails
+          const mockAppointments: Appointment[] = [
+            {
+              _id: "1",
+              customerId: "user_id",
+              barberId: "barber_1",
+              serviceId: "service_1",
+              date: "2024-01-15",
+              timeSlot: "2:30 PM",
+              status: "confirmed",
+              customerInfo: { name: user.name, phone: user.phone, email: user.email, notes: "" },
+              price: 25,
+              duration: 30,
+              service: { _id: "1", name: "Classic Cut", description: "", price: 25, duration: 30, isActive: true },
+              barber: { _id: "1", name: "Mike Johnson", email: "", phone: "", specialties: [], workingDays: [], workingHours: { start: "", end: "" }, isActive: true },
+              createdAt: new Date().toISOString()
+            },
+            {
+              _id: "2",
+              customerId: "user_id",
+              barberId: "barber_2",
+              serviceId: "service_2",
+              date: "2024-01-22",
+              timeSlot: "10:00 AM",
+              status: "confirmed",
+              customerInfo: { name: user.name, phone: user.phone, email: user.email, notes: "" },
+              price: 35,
+              duration: 45,
+              service: { _id: "2", name: "Full Service", description: "", price: 35, duration: 45, isActive: true },
+              barber: { _id: "2", name: "Sarah Smith", email: "", phone: "", specialties: [], workingDays: [], workingHours: { start: "", end: "" }, isActive: true },
+              createdAt: new Date().toISOString()
+            }
+          ];
+          setAppointments(mockAppointments);
+          
+          toast({
+            title: "Using Demo Data",
+            description: "Could not connect to server. Using demo appointments.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch appointments:', error);
+        setAppointments([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const pastAppointments = [
-    {
-      id: 3,
-      date: "2024-01-08",
-      time: "3:00 PM",
-      service: "Beard Trim",
-      barber: "Mike Johnson",
-      status: "completed"
-    },
-    {
-      id: 4,
-      date: "2023-12-28",
-      time: "11:30 AM",
-      service: "Classic Cut",
-      barber: "Tom Wilson",
-      status: "completed"
-    }
-  ];
+    fetchAppointments();
+  }, [toast, user.name, user.phone, user.email]);
+
+  const upcomingAppointments = appointments.filter(apt => 
+    new Date(apt.date) >= new Date() && apt.status === 'confirmed'
+  );
+
+  const pastAppointments = appointments.filter(apt => 
+    new Date(apt.date) < new Date() || apt.status === 'completed'
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -58,6 +102,32 @@ const Profile = () => {
       default: return 'bg-muted text-muted-foreground border-border';
     }
   };
+
+  const handleReschedule = async (appointmentId: string) => {
+    // This would typically open a reschedule modal
+    toast({
+      title: "Reschedule",
+      description: "Reschedule functionality would be implemented here.",
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen py-8">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="animate-pulse space-y-8">
+            <div className="h-8 bg-muted rounded w-48"></div>
+            <div className="h-32 bg-muted rounded"></div>
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-20 bg-muted rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-8">
@@ -90,13 +160,13 @@ const Profile = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    <span>Member since {user.memberSince}</span>
+                    <span>Member since {userStats.memberSince}</span>
                   </div>
                 </div>
 
                 <div className="mt-4">
                   <Badge variant="secondary" className="text-sm">
-                    {user.totalAppointments} Total Appointments
+                    {userStats.totalAppointments} Total Appointments
                   </Badge>
                 </div>
               </div>
@@ -110,7 +180,7 @@ const Profile = () => {
             {upcomingAppointments.length > 0 ? (
               <div className="space-y-4">
                 {upcomingAppointments.map((appointment) => (
-                  <Card key={appointment.id} className="card-elevated p-4 hover-lift">
+                  <Card key={appointment._id} className="card-elevated p-4 hover-lift">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-lg">
@@ -118,7 +188,7 @@ const Profile = () => {
                         </div>
                         
                         <div>
-                          <h3 className="font-semibold">{appointment.service}</h3>
+                          <h3 className="font-semibold">{appointment.service?.name}</h3>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
@@ -126,11 +196,11 @@ const Profile = () => {
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {appointment.time}
+                              {appointment.timeSlot}
                             </span>
                             <span className="flex items-center gap-1">
                               <User className="h-3 w-3" />
-                              {appointment.barber}
+                              {appointment.barber?.name}
                             </span>
                           </div>
                         </div>
@@ -140,7 +210,11 @@ const Profile = () => {
                         <Badge className={getStatusColor(appointment.status)}>
                           {appointment.status}
                         </Badge>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleReschedule(appointment._id)}
+                        >
                           Reschedule
                         </Button>
                       </div>
@@ -163,7 +237,7 @@ const Profile = () => {
             
             <div className="space-y-4">
               {pastAppointments.map((appointment) => (
-                <Card key={appointment.id} className="card-elevated p-4">
+                <Card key={appointment._id} className="card-elevated p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-muted/50 rounded-lg">
@@ -171,7 +245,7 @@ const Profile = () => {
                       </div>
                       
                       <div>
-                        <h3 className="font-semibold">{appointment.service}</h3>
+                        <h3 className="font-semibold">{appointment.service?.name}</h3>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
@@ -179,11 +253,11 @@ const Profile = () => {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {appointment.time}
+                            {appointment.timeSlot}
                           </span>
                           <span className="flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            {appointment.barber}
+                            {appointment.barber?.name}
                           </span>
                         </div>
                       </div>

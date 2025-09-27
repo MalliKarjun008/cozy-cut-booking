@@ -13,6 +13,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { AppointmentService, BookAppointmentData } from "@/services/appointmentService";
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -28,9 +29,10 @@ const BookingModal = ({ isOpen, onClose, selectedDate, selectedTime }: BookingMo
     email: "",
     notes: ""
   });
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     // Validate required fields
     if (!customerInfo.name || !customerInfo.phone) {
       toast({
@@ -41,15 +43,49 @@ const BookingModal = ({ isOpen, onClose, selectedDate, selectedTime }: BookingMo
       return;
     }
 
-    // Simulate booking
-    toast({
-      title: "Booking Confirmed!",
-      description: `Your appointment has been booked for ${selectedDate?.toLocaleDateString()} at ${selectedTime}.`,
-    });
+    if (!selectedDate || !selectedTime) {
+      toast({
+        title: "Invalid Selection",
+        description: "Please select a valid date and time.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Reset form and close modal
-    setCustomerInfo({ name: "", phone: "", email: "", notes: "" });
-    onClose();
+    setIsLoading(true);
+
+    try {
+      const appointmentData: BookAppointmentData = {
+        date: selectedDate.toISOString().split('T')[0],
+        timeSlot: selectedTime,
+        serviceId: "default_service_id", // You can make this dynamic
+        customerInfo
+      };
+
+      const response = await AppointmentService.bookAppointment(appointmentData);
+
+      if (response.success) {
+        toast({
+          title: "Booking Confirmed!",
+          description: `Your appointment has been booked for ${selectedDate.toLocaleDateString()} at ${selectedTime}.`,
+        });
+
+        // Reset form and close modal
+        setCustomerInfo({ name: "", phone: "", email: "", notes: "" });
+        onClose();
+      } else {
+        throw new Error(response.error || 'Failed to book appointment');
+      }
+    } catch (error) {
+      console.error('Booking error:', error);
+      toast({
+        title: "Booking Failed",
+        description: error instanceof Error ? error.message : "Unable to book appointment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -96,6 +132,7 @@ const BookingModal = ({ isOpen, onClose, selectedDate, selectedTime }: BookingMo
                 value={customerInfo.name}
                 onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
                 placeholder="Enter your full name"
+                disabled={isLoading}
               />
             </div>
 
@@ -106,6 +143,7 @@ const BookingModal = ({ isOpen, onClose, selectedDate, selectedTime }: BookingMo
                 value={customerInfo.phone}
                 onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
                 placeholder="(555) 123-4567"
+                disabled={isLoading}
               />
             </div>
 
@@ -117,6 +155,7 @@ const BookingModal = ({ isOpen, onClose, selectedDate, selectedTime }: BookingMo
                 value={customerInfo.email}
                 onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
                 placeholder="your@email.com"
+                disabled={isLoading}
               />
             </div>
 
@@ -128,6 +167,7 @@ const BookingModal = ({ isOpen, onClose, selectedDate, selectedTime }: BookingMo
                 onChange={(e) => setCustomerInfo({ ...customerInfo, notes: e.target.value })}
                 placeholder="Any specific requests or preferences?"
                 rows={3}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -138,14 +178,16 @@ const BookingModal = ({ isOpen, onClose, selectedDate, selectedTime }: BookingMo
               variant="outline"
               onClick={onClose}
               className="flex-1"
+              disabled={isLoading}
             >
               Cancel
             </Button>
             <Button
               onClick={handleBooking}
               className="flex-1 bg-gradient-to-r from-primary to-primary-glow"
+              disabled={isLoading}
             >
-              Confirm Booking
+              {isLoading ? "Booking..." : "Confirm Booking"}
             </Button>
           </div>
         </div>
